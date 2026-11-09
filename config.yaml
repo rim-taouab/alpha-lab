@@ -1,0 +1,58 @@
+# Paramètres du projet
+db_path: data/market.duckdb
+start_date: "2015-01-01"
+
+# ~50 grandes capitalisations américaines.
+# Attention : biais du survivant. Ce sont les leaders d'aujourd'hui,
+# les entreprises disparues depuis 2015 manquent (à corriger plus tard).
+tickers:
+  - AAPL
+  - MSFT
+  - AMZN
+  - GOOGL
+  - META
+  - NVDA
+  - BRK-B
+  - JPM
+  - JNJ
+  - V
+  - PG
+  - XOM
+  - UNH
+  - HD
+  - MA
+  - CVX
+  - ABBV
+  - PFE
+  - KO
+  - PEP
+  - MRK
+  - BAC
+  - WMT
+  - COST
+  - DIS
+  - CSCO
+  - ADBE
+  - CRM
+  - NFLX
+  - INTC
+  - ORCL
+  - T
+  - VZ
+  - CMCSA
+  - NKE
+  - MCD
+  - ABT
+  - TMO
+  - LLY
+  - AVGO
+  - TXN
+  - QCOM
+  - HON
+  - UNP
+  - UPS
+  - IBM
+  - CAT
+  - GS
+  - MS
+  - AMGN
