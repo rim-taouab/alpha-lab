@@ -4,5 +4,7 @@ yfinance>=0.2.40
 duckdb>=1.0
 pyyaml>=6.0
 matplotlib>=3.7
+scikit-learn>=1.3
+lightgbm>=4.0
 jupyter
 pytest>=8.0

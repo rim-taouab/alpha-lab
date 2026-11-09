@@ -24,20 +24,19 @@ def monthly_returns(prices: pd.DataFrame) -> pd.DataFrame:
     return to_monthly(prices).pct_change(fill_method=None)
 
 
-def backtest_momentum(
+def backtest_signal(
     prices: pd.DataFrame,
+    signal: pd.DataFrame,
     frac: float = 0.2,
-    lookback: int = 12,
-    gap: int = 1,
     cost_bps: float = 10.0,
 ) -> pd.DataFrame:
-    """Simule la stratégie et renvoie les rendements mensuels.
+    """Moteur de backtest générique : achète le top `frac` d'un signal mensuel.
 
-    Colonnes : ``strategy`` (momentum top `frac`, net de coûts) et ``benchmark``
-    (équipondéré). `cost_bps` = coûts de transaction en points de base appliqués
-    au turnover à chaque rebalancement (10 pb = 0,1 %).
+    `signal` = DataFrame (fin de mois × tickers) ; plus il est élevé, plus l'action
+    est privilégiée. Colonnes renvoyées : ``strategy`` (net de coûts) et
+    ``benchmark`` (équipondéré). Sans look-ahead : les poids décidés en t ne
+    touchent que le rendement de t+1.
     """
-    signal = momentum(prices, lookback=lookback, gap=gap)
     mask = top_fraction(signal, frac).astype(float)
     # poids = équipondéré sur les actions retenues (0 si aucune ce mois-là)
     weights = mask.div(mask.sum(axis=1).replace(0, np.nan), axis=0).fillna(0.0)
@@ -55,6 +54,21 @@ def backtest_momentum(
     invested = weights.shift(1).sum(axis=1).gt(0)
     first = invested.idxmax()  # premier mois réellement investi
     return out.loc[first:].dropna()
+
+
+def backtest_momentum(
+    prices: pd.DataFrame,
+    frac: float = 0.2,
+    lookback: int = 12,
+    gap: int = 1,
+    cost_bps: float = 10.0,
+) -> pd.DataFrame:
+    """Backtest momentum top `frac` (net de coûts en points de base).
+
+    Enveloppe de `backtest_signal` avec le signal momentum `lookback`-`gap`.
+    """
+    signal = momentum(prices, lookback=lookback, gap=gap)
+    return backtest_signal(prices, signal, frac=frac, cost_bps=cost_bps)
 
 
 def equity_curve(returns: pd.DataFrame | pd.Series) -> pd.DataFrame | pd.Series:
