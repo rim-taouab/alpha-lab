@@ -16,7 +16,7 @@ pip install -r requirements.txt
 python src/ingest.py             # télécharge ~10 ans de prix pour 50 actions -> data/market.duckdb
 python src/ingest.py --demo      # variante sans internet, avec des prix simulés
 pytest                           # lance les tests
-jupyter notebook notebooks/01_exploration.ipynb
+jupyter notebook notebooks/01_exploration.ipynb   # puis 02_backtest.ipynb
 ```
 
 Les tickers et la date de début se changent dans `config.yaml`.
@@ -27,19 +27,26 @@ Les tickers et la date de début se changent dans `config.yaml`.
 config.yaml                  paramètres (tickers, dates, base)
 src/ingest.py                téléchargement (yfinance) -> DuckDB, table `prices`
 src/analytics.py             rendements, volatilité, Sharpe, drawdown
+src/momentum.py              signal momentum 12-1 (passage mensuel, sélection du top)
+src/backtest.py              moteur de backtest mensuel, net de coûts, vs marché
+src/robustness.py            IC du Sharpe, balayage de paramètres, hors-échantillon
+src/ml.py                    modèle LightGBM réentraîné en walk-forward
 notebooks/01_exploration     première analyse des données
-tests/                       tests pytest
+notebooks/02_backtest        backtest momentum vs marché équipondéré
+tests/                       tests pytest (un par module de src/)
 data/                        base DuckDB (non versionnée)
 ```
 
 ## Feuille de route
 
-- [x] **Étape 1** : ingestion des prix et exploration
-- [ ] **Étape 2** : modèles dbt (rendements, volatilité glissante, momentum 12-1) et tests de qualité
-- [ ] **Étape 3** : backtest momentum mensuel (top 20 %, coûts de 10 pb), comparé à l'achat-conservation
-- [ ] **Étape 4** : rigueur : hors échantillon, sensibilité aux paramètres, intervalles de confiance du Sharpe
-- [ ] **Étape 5** : modèle ML (LightGBM) réentraîné en walk-forward, simulation avec capital de départ
+- [x] **Étape 1** : ingestion des prix et exploration (notebook `01`)
+- [x] **Étape 2** : signal momentum 12-1 en Python (passage en mensuel, sélection du top) et tests
+- [x] **Étape 3** : backtest momentum mensuel (top 20 %, coûts de 10 pb), comparé à l'achat-conservation (notebook `02`)
+- [x] **Étape 4** : rigueur : hors échantillon, sensibilité aux paramètres, intervalles de confiance du Sharpe (`robustness.py` + tests)
+- [x] **Étape 5** : modèle ML (LightGBM) réentraîné en walk-forward (`ml.py` + tests)
 - [ ] **Étape 6** : attribution factorielle (Fama-French), orchestration Airflow, dashboard Streamlit
+
+> Code et tests des étapes 4–5 en place ; le notebook de présentation `04_ml` reste à écrire.
 
 ## Limites connues
 
