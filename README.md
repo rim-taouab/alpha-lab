@@ -33,6 +33,8 @@ src/robustness.py            IC du Sharpe, balayage de paramètres, hors-échant
 src/ml.py                    modèle LightGBM réentraîné en walk-forward
 notebooks/01_exploration     première analyse des données
 notebooks/02_backtest        backtest momentum vs marché équipondéré
+notebooks/03_robustesse      IC du Sharpe, sensibilité, hors-échantillon
+notebooks/04_ml              modèle ML vs momentum vs marché
 tests/                       tests pytest (un par module de src/)
 data/                        base DuckDB (non versionnée)
 ```
@@ -43,10 +45,10 @@ data/                        base DuckDB (non versionnée)
 - [x] **Étape 2** : signal momentum 12-1 en Python (passage en mensuel, sélection du top) et tests
 - [x] **Étape 3** : backtest momentum mensuel (top 20 %, coûts de 10 pb), comparé à l'achat-conservation (notebook `02`)
 - [x] **Étape 4** : rigueur : hors échantillon, sensibilité aux paramètres, intervalles de confiance du Sharpe (`robustness.py` + tests)
-- [x] **Étape 5** : modèle ML (LightGBM) réentraîné en walk-forward (`ml.py` + tests)
+- [x] **Étape 5** : modèle ML (LightGBM) réentraîné en walk-forward (`ml.py` + tests, notebook `04`)
 - [ ] **Étape 6** : attribution factorielle (Fama-French), orchestration Airflow, dashboard Streamlit
 
-> Code et tests des étapes 4–5 en place ; le notebook de présentation `04_ml` reste à écrire.
+> Résultat de l'étape 5 : sur la période commune, le modèle ML **ne bat ni** le momentum simple **ni** le marché (Sharpe 0,86 contre 1,05 et 1,15, drawdown -36 %). La complexité n'apporte rien ici — c'est un résultat de contrôle, pas un échec.
 
 ## Limites connues
 
