@@ -5,9 +5,13 @@ une fonction de ``src/pipeline.py`` (déjà testée dans ``tests/test_pipeline.p
 Toute la logique quantitative vit dans ``src/`` ; Airflow ne gère ici que
 l'enchaînement, la planification et les reprises.
 
-    ingest ─┐
-            ├─> results   (results lit les deux tables écrites en amont)
-    factors ┘
+    membership ─> ingest ─┐
+                          ├─> results
+    factors ──────────────┘
+
+    (membership définit l'univers point-in-time ; ingest télécharge ses prix ;
+     results lit les tables écrites en amont. En univers `static`, membership
+     reste écrite mais n'est pas utilisée pour masquer.)
 
 Configuration par variables d'environnement (lues au parsing du DAG) :
     MOMENTUM_DEMO=true|false   prix/facteurs simulés (défaut true, sans internet)
@@ -56,7 +60,13 @@ INCLUDE_ML = _flag("MOMENTUM_ML", True)
 )
 def momentum_pipeline():
     @task
-    def ingest() -> str:
+    def membership() -> str:
+        from pipeline import run_membership
+
+        return str(run_membership(demo=DEMO))
+
+    @task
+    def ingest(membership_db: str) -> str:
         from pipeline import run_ingest
 
         return str(run_ingest(demo=DEMO))
@@ -83,8 +93,9 @@ def momentum_pipeline():
             summary["sharpe_ml"] = round(float(perf.loc["ml", "sharpe"]), 3)
         return summary
 
-    # ingest et factors sont indépendants ; results dépend des deux.
-    results(ingest(), factors())
+    # membership -> ingest ; factors en parallèle ; results dépend des deux.
+    m = membership()
+    results(ingest(m), factors())
 
 
 dag = momentum_pipeline()

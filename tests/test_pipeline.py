@@ -17,7 +17,9 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+import pipeline  # noqa: E402
 from pipeline import run_factors, run_ingest, run_pipeline, run_results  # noqa: E402
+from universe import load_membership  # noqa: E402
 
 TICKERS = ["AAA", "BBB", "CCC", "DDD", "EEE", "FFF", "GGG", "HHH", "III", "JJJ"]
 START = "2016-01-01"  # ~10 ans d'historique simulé -> assez pour le walk-forward ML
@@ -68,6 +70,20 @@ def test_run_results_shapes(db):
     attr = out["attribution"]
     assert set(attr["modele"]) == {"CAPM", "FF3", "FF3+Mom"}
     assert {"alpha_annuel", "alpha_tstat", "r2"}.issubset(attr.columns)
+
+
+def test_historical_universe_applies_membership(db, monkeypatch):
+    """Mode `sp500_historical` : la table membership est écrite et le masque appliqué."""
+    monkeypatch.setattr(pipeline, "_universe_mode", lambda: "sp500_historical")
+    pipeline.run_membership(demo=True, db_path=db)
+    assert "membership" in _tables(db)
+    universe = list(load_membership(db).columns)
+    assert len(universe) > 0  # univers résolu depuis l'appartenance (démo = tickers config)
+
+    run_ingest(demo=True, db_path=db, tickers=universe, start=START)
+    run_factors(demo=True, db_path=db, start=START)
+    out = run_results(db_path=db, include_ml=False)
+    assert {"momentum", "marche"}.issubset(out["perf"].index)
 
 
 def test_full_pipeline_with_ml_appends_run(db):

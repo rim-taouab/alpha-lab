@@ -77,11 +77,18 @@ def walk_forward_predict(
 
 
 def ml_backtest(
-    prices: pd.DataFrame, predictions: pd.Series, frac: float = 0.2, cost_bps: float = 10.0
+    prices: pd.DataFrame,
+    predictions: pd.Series,
+    frac: float = 0.2,
+    cost_bps: float = 10.0,
+    membership: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
-    """Transforme les prédictions en portefeuille (top `frac`) et le backteste."""
+    """Transforme les prédictions en portefeuille (top `frac`) et le backteste.
+
+    `membership` (optionnel) applique l'appartenance point-in-time à l'indice.
+    """
     signal = predictions.unstack("ticker")
-    return backtest_signal(prices, signal, frac=frac, cost_bps=cost_bps)
+    return backtest_signal(prices, signal, frac=frac, cost_bps=cost_bps, membership=membership)
 
 
 def feature_importance(panel: pd.DataFrame, params: dict | None = None) -> pd.Series:

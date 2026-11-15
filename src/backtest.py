@@ -29,6 +29,7 @@ def backtest_signal(
     signal: pd.DataFrame,
     frac: float = 0.2,
     cost_bps: float = 10.0,
+    membership: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Moteur de backtest générique : achète le top `frac` d'un signal mensuel.
 
@@ -36,7 +37,15 @@ def backtest_signal(
     est privilégiée. Colonnes renvoyées : ``strategy`` (net de coûts) et
     ``benchmark`` (équipondéré). Sans look-ahead : les poids décidés en t ne
     touchent que le rendement de t+1.
+
+    `membership` (optionnel) = masque booléen (fin de mois × tickers) d'appartenance
+    à l'indice. Fourni, on restreint le signal ET le benchmark aux titres réellement
+    membres à chaque date (point-in-time) : c'est le correctif du biais du survivant.
     """
+    if membership is not None:
+        mem = membership.reindex(index=signal.index, columns=signal.columns).fillna(False)
+        signal = signal.where(mem)  # hors indice -> NaN -> ignoré par le classement
+
     mask = top_fraction(signal, frac).astype(float)
     # poids = équipondéré sur les actions retenues (0 si aucune ce mois-là)
     weights = mask.div(mask.sum(axis=1).replace(0, np.nan), axis=0).fillna(0.0)
@@ -48,7 +57,12 @@ def backtest_signal(
     cost = (cost_bps / 1e4) * turnover.shift(1)  # coût du trade de t, payé sur t+1
     strategy = gross - cost
 
-    benchmark = mret.mean(axis=1)
+    # benchmark équipondéré, lui aussi restreint aux membres de l'indice à chaque date
+    bench_ret = mret
+    if membership is not None:
+        mem_b = membership.reindex(index=mret.index, columns=mret.columns).fillna(False)
+        bench_ret = mret.where(mem_b.shift(1).fillna(False))  # membre en t -> rendement de t+1
+    benchmark = bench_ret.mean(axis=1)
     out = pd.DataFrame({"strategy": strategy, "benchmark": benchmark})
 
     invested = weights.shift(1).sum(axis=1).gt(0)
@@ -62,13 +76,15 @@ def backtest_momentum(
     lookback: int = 12,
     gap: int = 1,
     cost_bps: float = 10.0,
+    membership: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Backtest momentum top `frac` (net de coûts en points de base).
 
     Enveloppe de `backtest_signal` avec le signal momentum `lookback`-`gap`.
+    `membership` (optionnel) applique l'appartenance point-in-time à l'indice.
     """
     signal = momentum(prices, lookback=lookback, gap=gap)
-    return backtest_signal(prices, signal, frac=frac, cost_bps=cost_bps)
+    return backtest_signal(prices, signal, frac=frac, cost_bps=cost_bps, membership=membership)
 
 
 def equity_curve(returns: pd.DataFrame | pd.Series) -> pd.DataFrame | pd.Series:

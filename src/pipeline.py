@@ -42,6 +42,13 @@ from ingest import (
     simulate_prices,
 )
 from ml import build_panel, ml_backtest, walk_forward_predict
+from universe import (
+    download_membership,
+    load_membership,
+    save_to_duckdb as save_membership,
+    simulate_membership,
+    to_monthly_membership,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("pipeline")
@@ -56,10 +63,53 @@ def _db_path(db_path: str | Path | None) -> Path:
     return ROOT / _load_config()["db_path"]
 
 
+def _universe_mode() -> str:
+    """Mode d'univers : ``static`` (50 tickers, biaisé) ou ``sp500_historical``."""
+    return _load_config().get("universe", "static")
+
+
 def _save_table(con: duckdb.DuckDBPyConnection, name: str, df: pd.DataFrame) -> None:
     con.register("_tmp", df)
     con.execute(f"CREATE OR REPLACE TABLE {name} AS SELECT * FROM _tmp")
     con.unregister("_tmp")
+
+
+# --------------------------------------------------------------------------- #
+# Étape 0 — appartenance historique à l'indice (si univers point-in-time)
+# --------------------------------------------------------------------------- #
+def run_membership(
+    demo: bool = False,
+    db_path: str | Path | None = None,
+    start: str | None = None,
+) -> Path:
+    """Écrit l'appartenance mensuelle point-in-time -> table ``membership``.
+
+    En mode démo, l'appartenance est simulée à partir des tickers de ``config.yaml``
+    (tous membres tout du long) ; sinon elle est téléchargée (S&P 500 historique).
+    """
+    cfg = _load_config()
+    start = start or cfg["start_date"]
+    path = _db_path(db_path)
+
+    if demo:
+        log.info("Appartenance (démo) : simulée depuis %s", start)
+        long = simulate_membership(cfg["tickers"], start)
+    else:
+        log.info("Appartenance : téléchargement S&P 500 historique depuis %s", start)
+        long = download_membership(start)
+    monthly = to_monthly_membership(long, start=start)
+    save_membership(monthly, path)
+    return path
+
+
+def _resolve_universe(path: Path, cfg: dict) -> list[str]:
+    """Tickers à ingérer : union de l'appartenance (mode historique) ou liste figée."""
+    if _universe_mode() == "sp500_historical":
+        try:
+            return list(load_membership(path).columns)
+        except Exception:  # table membership absente -> repli sur la liste figée
+            log.warning("Table 'membership' absente ; repli sur config['tickers'].")
+    return cfg["tickers"]
 
 
 # --------------------------------------------------------------------------- #
@@ -71,11 +121,15 @@ def run_ingest(
     tickers: list[str] | None = None,
     start: str | None = None,
 ) -> Path:
-    """Télécharge (ou simule) les prix quotidiens -> table ``prices``."""
+    """Télécharge (ou simule) les prix quotidiens -> table ``prices``.
+
+    En univers ``sp500_historical``, les tickers sont l'union de l'appartenance
+    historique (il faut donc avoir lancé ``run_membership`` avant).
+    """
     cfg = _load_config()
-    tickers = tickers or cfg["tickers"]
     start = start or cfg["start_date"]
     path = _db_path(db_path)
+    tickers = tickers or _resolve_universe(path, cfg)
 
     if demo:
         log.info("Ingestion (démo) : %s tickers simulés depuis %s", len(tickers), start)
@@ -132,8 +186,11 @@ def run_results(
     path = _db_path(db_path)
     prices = load_prices(path)
 
+    # masque d'appartenance point-in-time (uniquement en univers historique)
+    membership = load_membership(path) if _universe_mode() == "sp500_historical" else None
+
     # --- momentum vs marché (équipondéré) ---
-    bt = backtest_momentum(prices, frac=frac, cost_bps=cost_bps)
+    bt = backtest_momentum(prices, frac=frac, cost_bps=cost_bps, membership=membership)
     perf = {
         "momentum": performance(bt["strategy"]),
         "marche": performance(bt["benchmark"]),
@@ -147,7 +204,7 @@ def run_results(
     if include_ml:
         panel = build_panel(prices)
         preds = walk_forward_predict(panel)
-        bt_ml = ml_backtest(prices, preds, frac=frac, cost_bps=cost_bps)
+        bt_ml = ml_backtest(prices, preds, frac=frac, cost_bps=cost_bps, membership=membership)
         perf["ml"] = performance(bt_ml["strategy"])
         equity_series["ml"] = equity_curve(bt_ml["strategy"])
 
@@ -203,7 +260,8 @@ def run_pipeline(
     db_path: str | Path | None = None,
     include_ml: bool = True,
 ) -> dict[str, pd.DataFrame]:
-    """Enchaîne les trois étapes (pratique hors Airflow : CLI, notebook, test)."""
+    """Enchaîne les étapes (pratique hors Airflow : CLI, notebook, test)."""
+    run_membership(demo=demo, db_path=db_path)
     run_ingest(demo=demo, db_path=db_path)
     run_factors(demo=demo, db_path=db_path)
     return run_results(db_path=db_path, include_ml=include_ml)

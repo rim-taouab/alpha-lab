@@ -2,6 +2,13 @@
 db_path: data/market.duckdb
 start_date: "2015-01-01"
 
+# Univers d'investissement :
+#   static            -> la liste `tickers` ci-dessous (50 noms) ; backtest BIAISÉ
+#                        (biais du survivant : ce sont les gagnants d'aujourd'hui).
+#   sp500_historical  -> appartenance historique au S&P 500 (point-in-time) via
+#                        src/universe.py ; backtest CORRIGÉ du biais du survivant.
+universe: static
+
 # ~50 grandes capitalisations américaines.
 # Attention : biais du survivant. Ce sont les leaders d'aujourd'hui,
 # les entreprises disparues depuis 2015 manquent (à corriger plus tard).

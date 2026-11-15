@@ -89,3 +89,25 @@ def test_performance_table_shape(prices):
     tbl = performance_table(backtest_momentum(prices, frac=0.34))
     assert list(tbl.index) == ["strategy", "benchmark"]
     assert tbl.shape == (2, 4)
+
+
+def _all_members(prices, cols=("A", "B", "C")):
+    midx = pd.date_range(prices.index[0], prices.index[-1], freq="ME")
+    return pd.DataFrame(True, index=midx, columns=list(cols))
+
+
+def test_membership_all_members_is_noop(prices):
+    """Un masque entièrement membre ne change rien par rapport à l'absence de masque."""
+    mem = _all_members(prices)
+    with_mask = backtest_momentum(prices, frac=0.34, cost_bps=0, membership=mem)
+    without = backtest_momentum(prices, frac=0.34, cost_bps=0)
+    pd.testing.assert_frame_equal(with_mask, without)
+
+
+def test_membership_excludes_the_winner(prices):
+    """Exclure A (toujours le meilleur) de l'indice -> on détient B (plat), pas A."""
+    mem = _all_members(prices)
+    mem["A"] = False  # A n'est jamais membre
+    bt = backtest_momentum(prices, frac=0.34, cost_bps=0, membership=mem)
+    # B est plat (rendement 0) : la stratégie ne capte plus le +1 %/mois de A.
+    assert bt["strategy"].iloc[-1] == pytest.approx(0.0, abs=1e-9)
