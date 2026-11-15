@@ -36,6 +36,7 @@ src/ml.py                    modèle LightGBM réentraîné en walk-forward
 src/factors.py               facteurs Fama-French + régression d'attribution (alpha, bêtas)
 src/pipeline.py              pipeline de bout en bout (ingestion -> facteurs -> résultats persistés)
 dags/momentum_pipeline.py    DAG Airflow qui orchestre le pipeline
+app/dashboard.py             dashboard Streamlit (courbes, métriques, attribution)
 notebooks/01_exploration     première analyse des données
 notebooks/02_backtest        backtest momentum vs marché équipondéré
 notebooks/03_robustesse      IC du Sharpe, sensibilité, hors-échantillon
@@ -54,7 +55,7 @@ data/                        base DuckDB (non versionnée)
 - [x] **Étape 5** : modèle ML (LightGBM) réentraîné en walk-forward (`ml.py` + tests, notebook `04`)
 - [x] **Étape 6a** : attribution factorielle Fama-French (`factors.py` + tests, notebook `05`)
 - [x] **Étape 6b** : pipeline de bout en bout (`pipeline.py` + tests) orchestré par Airflow (`dags/`)
-- [ ] **Étape 6c** : dashboard Streamlit sur les tables de résultats
+- [x] **Étape 6c** : dashboard Streamlit sur les tables de résultats (`app/dashboard.py`)
 
 > Résultat de l'étape 5 : sur la période commune, le modèle ML **ne bat ni** le momentum simple **ni** le marché (Sharpe 0,86 contre 1,05 et 1,15, drawdown -36 %). La complexité n'apporte rien ici — c'est un résultat de contrôle, pas un échec.
 >
@@ -97,7 +98,23 @@ airflow dags test momentum_pipeline      # exécute le DAG une fois, en local
 airflow standalone                       # http://localhost:8080
 ```
 
-Les résultats atterrissent dans les tables DuckDB (`data/market.duckdb`), que le futur dashboard Streamlit (étape 6c) lira directement.
+Les résultats atterrissent dans les tables DuckDB (`data/market.duckdb`), que le dashboard Streamlit lit directement.
+
+## Dashboard Streamlit
+
+Une fois le pipeline exécuté (donc les tables `perf` / `equity` / `attribution` écrites) :
+
+```bash
+streamlit run app/dashboard.py      # ouvre http://localhost:8501
+```
+
+Le dashboard affiche, à partir de la base DuckDB :
+
+- les **métriques par stratégie** (Sharpe, rendement, volatilité, drawdown) ;
+- les **courbes de capital** momentum / marché / ML (interactives) ;
+- l'**attribution factorielle** du momentum avec le seuil de significativité |t| = 2.
+
+Il se rafraîchit automatiquement à chaque nouvelle exécution du pipeline (le cache suit la date de modification de la base).
 
 ## Limites connues
 
